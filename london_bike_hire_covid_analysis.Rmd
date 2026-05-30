@@ -1,0 +1,651 @@
+---
+title: "London Bike Hire Behavioural Demand Analysis During COVID-19"
+subtitle: "Analysing bike hire patterns before, during and after COVID-19 restrictions"
+author: "Piyali Narnaware"
+output: html_document
+---
+U5587270
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2) 
+library(dplyr)
+library(lubridate) 
+library(tsibble)
+library(forecast)
+library(fable)
+library(conflicted)
+library(lmtest)
+#library(car)
+library(scales)
+
+```
+
+## Project Overview
+
+This project analyses London bike hire demand between 2010 and 2023, with a focus on how COVID-19 restrictions and behavioural changes influenced daily bike hire patterns.
+
+The analysis explores yearly trends, pre/during/post-COVID demand shifts, policy indicators, regression models and ANOVA-based model comparison.
+
+## Data Dictionary
+
+Variable | Description
+------------- | -------------
+Date | Date on which the record was created
+Hires | On particular date number of bikes that were hired
+schools_closed | This indicates whether the school was open or closed (indicated by 0 or 1)
+pubs_closed | This indicates whether the pubs was open or closed (indicated by 0 or 1)
+shops_closed | This indicates whether the shops was open or closed (indicated by 0 or 1)
+eating_places_closed | This indicates whether the eating places was open or closed (indicated by 0 or 1)
+stay_at_home | Implementation of Stay home policy on particular date (indicated by 0 or 1)
+household_mixing_indoors_banned | Indoor household mixing being banned on given date (indicated by 0 or 1)
+wfh | Work from home regulations on given date (indicated by 0 or 1)
+rule_of_6_indoors | Implementation of "Rule No.6" on given date (indicated by 0 or 1)
+curfew | Curfew on given date (indicated by 0 or 1)
+eat_out_to_help_out | "Eat out to help out" plan implementation on given date (indicated by 0 or 1)
+day | day on which the record was created
+month | month - in which the record was created
+year | year - in which the record was created
+
+## Data Import
+```{r }
+#importing the data from csv file 
+#using read.csv function for reading the file and saving in variable 'data'
+data = read.csv("E:/Git_projects/london_bike_hire/London_COVID_bikes.csv", stringsAsFactors = TRUE)
+
+#using head function to view the first n parts of the data set
+
+head(data)
+```
+## Data Cleaning and Preparation
+
+```{r}
+#Converting the date into character vector by using as.character
+data$date <- as.character(data$date)
+
+#Converting the day into character vector by using as.character
+data$day <- as.character(data$day)
+
+#Converting the month into character vector by using as.character
+data$month <- as.character(data$month)
+```
+
+```{r}
+#finding out total number of missing values in the data set and storing the value in missing_value variable
+missing_value <- sum(is.na(data))
+
+#checking the summary of the data set 
+summary(data)
+
+```
+## Dataset Structure
+
+```{r}
+#understanding the class, format and type of the data set by using str function
+str(data)
+
+```
+
+```{r}
+# Checking for dates that the repeating in the data set and saving into variable duplicate
+#using count function to group the data by date and count the number of rows
+#using filter function to keep rows where n is greater than 1 in order to 
+duplicate <- data %>% 
+  dplyr::count(date) %>% 
+  dplyr::filter(n > 1)
+
+# View the duplicates
+print(duplicate)
+```
+As shown above, the data set contains only one duplicate value for the date “2021-12-13”. Upon careful inspection, we found that the WFH column has different values in the two duplicate rows. We are unable to determine the accuracy of either entry. Hence, we decided not to remove the duplicate rows from the data set.
+
+
+## Data Preparation and Outlier Review
+```{r}
+# converting day and month variable to categorical variable by using factor function
+data$day <- factor(data$day, levels = unique(data$day), ordered = TRUE)
+
+data$month <- factor(data$month, levels = unique(data$month), ordered = TRUE)
+
+#check for missing values
+sum(is.na(data))
+
+#displaying the structure of the data 
+str(data)
+```
+
+```{r}
+#in order to check the outliers first lets check the summary of the variable Hires
+
+summary(data$Hires)
+
+```
+
+```{r}
+#creating a box plot in order to understand the outliers using function ggplot
+
+ggplot(data, aes(x = "", y = Hires)) +
+  geom_boxplot(fill = "skyblue") +
+  labs(
+    title = "Distribution of London Bike Hire Demand",
+    x = NULL,
+    y = "Number of Bike Hires"
+  ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+```
+
+```{r}
+#checking for the times when no bikes were rented
+zerohire_data <- data[data$Hires == 0, ]
+
+```
+
+The zero values that are being observed in the above data on the dates 10th and 11th Sept 2022, experienced low demand or has recorded zero entry is because of the interruption of the service and hence the service wasn't operational therefore the values are valid.
+
+```{r}
+#checking for the times when more than 60,000 bikes were rented
+highhire_data <- data[data$Hires > 60000,]
+```
+
+the number of bikes that is held by the organisation is 1,20,000 and hence more than 60,000 bikes rented in a single day are valid entries 
+
+## Yearly Bike Hire Demand
+
+```{r}
+#Aggregating total number of hire for each year
+yearlyhired_data <- data %>%
+  group_by(year) %>%
+  summarise(Hires = sum(Hires))
+
+#displaying the structure
+str(yearlyhired_data)
+```
+
+```{r}
+#displaying the summary 
+summary(yearlyhired_data)
+```
+
+```{r}
+# total number of bikes hired for each year
+yearlyhired_data <- aggregate(Hires ~ year, data = data, sum)
+
+ggplot(yearlyhired_data, aes(x = factor(year), y = factor(Hires), fill= factor(year))) + theme_classic() +
+  geom_bar(stat = "identity") +
+  geom_histogram(stat = "identity", color = "black") +
+  labs(x = "Year", y = "Number of Hires", title = "London Bike Hire Demand by Year")
+```
+
+
+## Pre, During and Post-COVID Segmentation
+```{r}
+# Pre covid
+pre_data <- data %>% dplyr::filter(date < as.Date("2020-03-01"))
+
+str(pre_data)
+```
+
+
+```{r}
+# During Covid
+during_data <- data %>% dplyr::filter(year >= 2020) %>%
+  dplyr:: filter(date <= as.Date("2021-03-31"))
+
+str(during_data)
+```
+
+```{r}
+# Post Covid
+post_data <- data %>% dplyr::filter(date >=as.Date("2021-04-01"))
+
+str(post_data)
+```
+
+
+## Plots : Pre-covid
+
+```{r}
+#Plotting for pre covid
+
+data_precovid <- tidyr::pivot_longer(pre_data, cols = c("schools_closed", "pubs_closed", "shops_closed","eating_places_closed", "stay_at_home",                                     "household_mixing_indoors_banned", "wfh",                                    
+ "rule_of_6_indoors", "curfew", "eat_out_to_help_out"))
+
+data_precovid_count <- data_precovid %>%
+  count(name, value)
+
+ggplot(data_precovid_count, aes(x = factor(value), y = n, fill = factor(value))) +
+  geom_col() +
+  labs(title = "COVID Policy Variables Before COVID-19",
+       x = "Variable Values",
+       y = "Count") +
+  facet_wrap(~name, scales = "free_y", nrow = 2)
+
+```
+
+## During Covid
+```{r}
+#Plotting for during covid
+
+data_duringcovid <- tidyr::pivot_longer(during_data, cols = c("schools_closed", "pubs_closed", "shops_closed","eating_places_closed", "stay_at_home",                                     "household_mixing_indoors_banned", "wfh",                                    "rule_of_6_indoors", "curfew", "eat_out_to_help_out"))
+
+data_duringcovid_count <- data_duringcovid %>%
+  count(name, value)
+
+ggplot(data_duringcovid_count, aes(x = factor(value), y = n, fill = factor(value))) +
+  geom_col() +
+  labs(title = "COVID Policy Variables During COVID-19",
+       x = "Variable Values",
+       y = "Count") +
+  facet_wrap(~name, scales = "free_y", nrow = 2)
+
+```
+
+## Post Covid
+```{r}
+#Plotting for post covid
+data_postcovid <- tidyr::pivot_longer(post_data, cols = c("schools_closed", "pubs_closed", "shops_closed","eating_places_closed", "stay_at_home",                                     "household_mixing_indoors_banned", "wfh",                                    
+ "rule_of_6_indoors", "curfew", "eat_out_to_help_out"))
+
+data_postcovid_count <- data_postcovid %>%
+  count(name, value)
+
+ggplot(data_postcovid_count, aes(x = factor(value), y = n, fill = factor(value))) +
+  geom_col() +
+  labs(title = "COVID Policy Variables After COVID-19",
+       x = "Variable Values",
+       y = "Count") +
+  facet_wrap(~name, scales = "free_y", nrow = 2)
+```
+
+## COVID Policy Timeline
+
+```{r}
+#Reshaping the data for creating timeline
+imp_policy_during <- tidyr::pivot_longer(during_data, 
+           cols = c("schools_closed", "pubs_closed", "shops_closed",                                            "eating_places_closed", "stay_at_home",                                                              "household_mixing_indoors_banned", "wfh",                                     
+             "rule_of_6_indoors", "curfew", "eat_out_to_help_out")) 
+
+imp_policy_post <-tidyr::pivot_longer(post_data, 
+           cols = c("schools_closed", "pubs_closed", "shops_closed",                                            "eating_places_closed", "stay_at_home",                                                              "household_mixing_indoors_banned", "wfh",                                     
+             "rule_of_6_indoors", "curfew", "eat_out_to_help_out"))
+  
+imp_policy <- dplyr::bind_rows(imp_policy_during,imp_policy_post)
+
+# Convert the date column to Date format
+imp_policy$date <- as.Date(imp_policy$date)
+
+# Plot the timeline
+
+g1 <- ggplot(imp_policy, aes(x = date, y = name, fill = factor(value))) +
+  geom_tile(alpha = 0.5) +
+  labs(title = "COVID Policy Implementation Timeline",
+       x = "Date",
+       y = "Policy",
+       fill = "Policy Status") +
+  scale_fill_manual(values = c("0" = "white", "1" = "black")) +
+  theme(text = element_text(size = 10), # seting the font size for all text elements
+        axis.text.x = element_text(angle = 0, vjust = 0.5), # rotate and align the x-axis text
+        legend.position = "bottom") # fixing the legend to the bottom
+
+print(g1)
+```
+## Bike Hire Comparison Before, During and After COVID-19
+
+```{r}
+#combining the before, during and after covid data
+
+combined_data <- bind_rows(
+  pre_data = mutate(pre_data, period = " PRE COVID"),
+  during_data = mutate(during_data, period = "DURING COVID"),
+  post_data = mutate(post_data, period = "POST COVID"),
+  .id = "source")
+  
+head(combined_data)
+
+```
+
+
+```{r}
+#printing the combined graph to understand the hiring of bikes pre and post covid
+
+g2 <- ggplot(combined_data, aes(x = factor(year), y = Hires, fill = factor(period))) +
+   geom_tile(alpha = 0.5) +
+  geom_col(position = "dodge") +
+  labs(title = "Bike Hires Pre, during and Post Covid",
+       x = "Year",
+       y = "Number of bikes hired" ,
+       fill = "period" ) 
+   
+print(g2)
+```
+## Regression Analysis 
+
+# Regression Model - WFH (Work From Home)
+```{r}
+# Regression model : work from home and number of hired bikes
+reg_model_wfh <- lm(Hires ~ wfh , data = data)
+
+summary(reg_model_wfh)
+```
+
+
+```{r}
+cbind(coef(reg_model_wfh), confint(reg_model_wfh))
+```
+
+# Regression Model - WFH (Work From Home) - yearly basis
+```{r}
+ 
+reg_model_wfh_year <- lm(Hires ~ wfh *as.factor(year), data = data)
+
+summary(reg_model_wfh_year)
+```
+
+```{r}
+cbind(coef(reg_model_wfh_year), confint(reg_model_wfh_year))
+```
+
+# Regression Model - WFH (Work From Home) - monthly basis
+```{r}
+
+reg_model_wfh_month <- lm(Hires ~ wfh *as.character(month), data = data)
+
+summary(reg_model_wfh_month)
+```
+
+
+```{r}
+cbind(coef(reg_model_wfh_month), confint(reg_model_wfh_month))
+```
+
+# Regression Model - WFH (Work From Home) - daily basis
+```{r}
+reg_model_wfh_day <- lm(Hires ~ wfh *as.character(day), data = data)
+
+summary(reg_model_wfh_day)
+```
+
+```{r}
+cbind(coef(reg_model_wfh_day), confint(reg_model_wfh_day))
+```
+It can be inferred from the above output that when wfh increases the number of hired bikes increases by 1769.1 which is the Coefficient of wfh and this can be said with 95 % confidence that this effect lies between 1117 and 2421. From significant codes it can be inferred that wfh has some amount of effect on hired bikes. The variations between the actual and anticipated values of "Hires" are known as residuals. The minimum, first quartile (1Q), median, third quartile (3Q), and maximum residuals are given in the summary. The smaller p value concludes that the model is performing well and the relation between WFh and hires is statistically significant.
+The regression model for yearly basis has coefficient of wfh negative which means that increase in wfh would decrease the number of hires
+The regression model for monthly and daily basis has coefficient of wfh positive which means that increase in wfh would increase the number of hires.
+The R squared value for year and month shows that when they are considered, the model can be demonstrated clearly
+
+
+# Regression Model - Eat Out to Help Out scheme
+```{r}
+#Regression Model - Eat Out to Help Out scheme and number of bikes hired
+reg_model_eotho <- lm(Hires ~ eat_out_to_help_out , data = data)
+
+summary(reg_model_eotho)
+```
+
+ 
+```{r}
+cbind(coef(reg_model_eotho), confint(reg_model_eotho))
+```
+
+# Regression Model - Eat Out to Help Out scheme - yearly basis
+```{r}
+reg_model_eotho_year <- lm(Hires ~ eat_out_to_help_out *as.factor(year), data = data)
+
+summary(reg_model_eotho_year)
+```
+
+```{r}
+cbind(coef(reg_model_eotho_year), confint(reg_model_eotho_year))
+```
+
+# Regression Model - Eat Out to Help Out scheme - monthly basis
+```{r}
+reg_model_eotho_month <- lm(Hires ~ eat_out_to_help_out *as.character(month), data = data)
+
+summary(reg_model_eotho_month)
+```
+
+```{r}
+cbind(coef(reg_model_eotho_month), confint(reg_model_eotho_month))
+```
+
+# Regression Model - Eat Out to Help Out scheme - daily basis
+```{r}
+reg_model_eotho_day <- lm(Hires ~ eat_out_to_help_out *as.character(day), data = data)
+
+summary(reg_model_eotho_day)
+```
+
+```{r}
+cbind(coef(reg_model_eotho_day), confint(reg_model_eotho_day))
+```
+Inference : 
+It can be inferred from the above output that when eat out to help out increases the number of hired bikes increases by 9868.5 which is the Coefficient of eat out to help out and this can be said with 95 % confidence that this effect lies between 6276 and 13460. From significant codes it can be inferred that eat out to help out has some amount of effect on hired bikes. The variations between the actual and anticipated values of "Hires" are known as residuals. The minimum, first quartile (1Q), median, third quartile (3Q), and maximum residuals are given in the summary. The smaller p value concludes that the model is performing well and the relation between eat out to help out and hires is statistically significant.
+The regression model for yearly basis has coefficient of eat out to help out is positive which means that increase in participation to this scheme would increase the number of hires
+Similarly, the regression model for monthly and daily basis has coefficient positive which means that increase in participation would increase the number of hires.
+The R squared value for year and month shows that when they are considered, the model can be demonstrated clearly
+
+# Regression Model - Rule of 6 Indoors
+```{r}
+reg_model_ro6i <- lm(Hires ~ rule_of_6_indoors , data = data)
+
+summary(reg_model_ro6i)
+```
+
+```{r}
+cbind(coef(reg_model_ro6i), confint(reg_model_ro6i))
+```
+
+# Regression Model - Rule of 6 Indoors - yearly basis
+```{r}
+reg_model_ro6i_year <- lm(Hires ~ rule_of_6_indoors *as.factor(year), data = data)
+
+summary(reg_model_ro6i_year)
+```
+
+```{r}
+cbind(coef(reg_model_ro6i_year), confint(reg_model_ro6i_year))
+```
+
+# Regression Model - Rule of 6 Indoors - monthly basis
+```{r}
+reg_model_ro6i_month <- lm(Hires ~ rule_of_6_indoors *as.character(month), data = data)
+
+summary(reg_model_ro6i_month)
+```
+
+```{r}
+cbind(coef(reg_model_ro6i_month), confint(reg_model_ro6i_month))
+```
+
+# Regression Model - Rule of 6 Indoors - daily basis
+```{r}
+reg_model_ro6i_day <- lm(Hires ~ rule_of_6_indoors *as.character(day), data = data)
+
+summary(reg_model_ro6i_day)
+```
+
+```{r}
+cbind(coef(reg_model_ro6i_day), confint(reg_model_ro6i_day))
+```
+Inference : 
+It can be inferred from the above output that when rule of 6 indoors increases the number of hired bikes increases by 9309 which is the Coefficient of eat out to help out and this can be said with 95 % confidence that this effect lies between 7367 and 11251. From significant codes it can be inferred that rule of 6 indoors scheme has some amount of effect on hired bikes. The variations between the actual and anticipated values of "Hires" are known as residuals. The minimum, first quartile (1Q), median, third quartile (3Q), and maximum residuals are given in the summary. The smaller p value concludes that the model is performing well and the relation between rule of 6 indoors and hires is statistically significant.
+The regression model for yearly basis has coefficient of rule of 6 indoors is positive which means that increase in participation to this scheme would increase the number of hires
+Similarly, the regression model for monthly and daily basis has coefficient positive which means that increase in participation would increase the number of hires.
+The R squared value for year and month shows that when they are considered, the model can be demonstrated clearly
+
+# Graph : number of hired Bikes - monthly 
+```{r}
+
+combined_data_month <- bind_rows(
+  pre_data = mutate(pre_data, period = " PRE COVID"),
+  during_data = mutate(during_data, period = "DURING COVID"),
+  post_data = mutate(post_data, period = "POST COVID"),
+  .id = "period")
+
+monthlyhired_data <- aggregate(Hires ~ month + period , data = combined_data_month, sum)
+
+head(monthlyhired_data)
+```
+
+
+```{r}
+
+g3 <- ggplot(monthlyhired_data, aes(x = month, y = Hires, fill = period)) +
+  geom_col(position = "dodge") +  # Use only geom_col for bars
+  labs(title = "Monthly Bike Hire Demand by COVID Period",
+       x = "Month",
+       y = "Number of Bikes Hired",
+       fill = "Period") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma)  
+
+print(g3)
+```
+
+From the above graph is can be said that the hiring of bike increases in Quarter 2 and then descends Quarter 3 with least demand in the month of December followed by January and Feburary. This trend was followed at all the periods i.e.  Pre covid, during covid and post covid
+
+# Graph : number of hired Bikes - Day 
+
+```{r}
+
+combined_data_day <- bind_rows(
+  pre_data = mutate(pre_data, period = " PRE COVID"),
+  during_data = mutate(during_data, period = "DURING COVID"),
+  post_data = mutate(post_data, period = "POST COVID"),
+  .id = "period")
+
+combined_data_day$Hires <- as.factor(combined_data_day$Hires)
+
+dailyhired_data <- aggregate(Hires ~ day + period , data = combined_data_month, sum)
+
+dailyhired_data
+```
+
+```{r}
+
+g4 <- ggplot(dailyhired_data, aes(x = Hires, y = day, fill = period)) +
+   geom_tile(alpha = 0.5) +
+  geom_col(stat = "identity", position = "dodge") +
+  labs(title = "Day-wise Bike Hire Demand by COVID Period",
+          x = "Day",
+       y = "Number of bikes hired" ,
+       fill = "period" ) +
+   theme(axis.text.x = element_text(angle = 0, vjust = 0.5))
+
+g4 <- g4 +
+  scale_x_continuous(labels = scales::comma)
+
+print(g4)
+```
+
+Inference : significant number of bikes were hired during the mid week days i.e. Tuesday Wednesday and Thursday and the least number of bikes were hired on Sunday. This trend was followed throughout all the periods i.e. pre covid, during covid and post covid. 
+
+
+# Correlation Analysis 
+
+```{r}
+data$schools_closed <- as.numeric(data$schools_closed)
+data$pubs_closed <- as.numeric(data$pubs_closed)
+data$shops_closed <- as.numeric(data$shops_closed)
+data$eating_places_closed <- as.numeric(data$eating_places_closed)
+data$stay_at_home <- as.numeric(data$stay_at_home)
+data$household_mixing_indoors_banned <-as.numeric(data$household_mixing_indoors_banned)
+data$wfh <- as.numeric(data$wfh)
+data$rule_of_6_indoors <- as.numeric(data$rule_of_6_indoors)
+data$curfew <- as.numeric(data$curfew)
+data$eat_out_to_help_out <- as.numeric(data$eat_out_to_help_out)
+```
+
+```{r}
+#Correlation between schemes and Hires
+wfh_corelation <- cor(data$Hires, data$wfh, method = "pearson")
+ro6i_corelation <- cor(data$Hires, data$rule_of_6_indoors, method = "pearson")
+eotho_corelation <- cor(data$Hires, data$eat_out_to_help_out, method = "pearson")
+```
+
+
+```{r}
+corelation <- c(wfh = wfh_corelation, rule_of_6_indoors = ro6i_corelation, 
+                  eat_out_to_help_out = eotho_corelation)
+
+print(corelation)
+```
+
+The above Correlation code is used to calculate the correlation between the number of hired bikes and three different variable schemes : WFH (work from home) scheme, Rule of 6 indoors(ro6i) and eat out to help out scheme (eotho). The output shows the correlation.
+
+Based on the output we can infer that - 
+  - There is a weak or slight correlation of 7% between the number of hires and the WFH variable, which implies that as the number of people working from home increases the hiring of the bikes also slightly increases but this hiring is not strongly affected by the work from home scheme
+  - There is a weak correlation of 13% between the number of hires and the ro6i variable, which implies that as the proportion of people following the rule of 6 indoors increases the hiring of the bikes also slightly increases but this hiring is not strongly affected by this scheme
+  - There is a weak correlation of 7% between the number of hires and the eotho variable, which implies that as the number of people increases in the eat out to help out scheme the hiring of the bikes also slightly increases but this hiring is not strongly affected by this scheme
+  
+  In conclusion, it can be said that these schemes didn't have a strong linear relationship with the number of hiring, although the correlation was positive but was significantly affecting the hiring.
+
+
+## Model Comparison Using ANOVA 
+
+# Work from home scheme 
+
+```{r}
+anova(reg_model_wfh, reg_model_wfh_year)
+```
+
+The test suggests that the interaction between wfh scheme and year when included improves the model significantly to predict the number of hired bikes. The higher f score (69.7) implies that year variable contribute in the hiring of the bike
+```{r}
+anova(reg_model_wfh, reg_model_wfh_month)
+```
+The test suggests that the interaction between wfh scheme and month when included improves the model significantly to predict the number of hired bikes. The higher f score (122.1) implies that month variable contribute significantly in the hiring of the bike.
+
+```{r}
+anova(reg_model_wfh, reg_model_wfh_day)
+```
+The test suggests that the interaction between wfh scheme and day when included improves the model significantly to predict the number of hired bikes. The higher f score (27.06) implies that day variable contributes in the hiring of the bike.
+The most significantly contributing variable is the month variable and therefore should be used.
+
+# Rule of 6 indoor scheme
+
+```{r}
+anova(reg_model_ro6i, reg_model_ro6i_year)
+```
+The test suggests that the interaction between rule of 6 indoors scheme and year when included improves the model significantly to predict the number of hired bikes. The higher f score (62.85) implies that year variable contributes in the hiring of the bike.
+```{r}
+anova(reg_model_ro6i, reg_model_ro6i_month)
+```
+The test suggests that the interaction between ro6i scheme and month when included improves the model significantly to predict the number of hired bikes. The higher f score (168.57) implies that month variable contributes in the hiring of the bike.
+
+```{r}
+anova(reg_model_ro6i, reg_model_ro6i_day)
+```
+The test suggests that the interaction between ro6i scheme and day when included improves the model significantly to predict the number of hired bikes. The higher f score (22.495) implies that day variable contributes in the hiring of the bike.
+The most significantly contributing variable is the month variable and therefore should be used.
+
+# Eat out to help out Scheme
+
+```{r}
+anova(reg_model_eotho, reg_model_eotho_year)
+```
+The test suggests that the interaction between eotho scheme and year when included improves the model significantly to predict the number of hired bikes. The higher f score (69.58) implies that year variable contributes in the hiring of the bike.
+```{r}
+anova(reg_model_eotho, reg_model_eotho_month)
+```
+The test suggests that the interaction between eotho scheme and month when included improves the model significantly to predict the number of hired bikes. The higher f score (234.89) implies that month variable contributes in the hiring of the bike.
+
+```{r}
+anova(reg_model_eotho, reg_model_eotho_day)
+```
+The test suggests that the interaction between eotho scheme and day when included improves the model significantly to predict the number of hired bikes. The higher f score (20.75) implies that day variable contributes in the hiring of the bike.
+The most significantly contributing variable is the month variable and therefore should be used.
+
+
+
+
+
+
+
