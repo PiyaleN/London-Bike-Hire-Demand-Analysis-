@@ -44,15 +44,47 @@ This project investigates how these policy changes influenced bike hire behaviou
 * Work-from-home and COVID restriction variables alone did not fully explain bike hire demand.
 * ANOVA results suggested that adding time-based interaction effects improved the ability to explain bike hire variation.
 
-## Visualisations
+## ## Visualisations
 
-![Yearly Bike Hires](yearly_bike_hires.png)
+### Yearly Bike Hire Trends
+
+Shows the overall change in London bike hire demand across different years, highlighting behavioural shifts during and after COVID-19 restrictions.
+
+![Yearly Bike Hire Trends](yearly_bike_hire_trends.png)
+
+---
+
+### COVID Period Demand Comparison
+
+Compares bike hire demand before, during and after COVID-19 to identify changes in mobility behaviour and transport usage patterns.
+
+![COVID Period Comparison](covid_period_comparison.png)
+
+---
+
+### Monthly Demand Patterns
+
+Analyses month-wise variation in bike hire demand across different COVID periods to understand seasonal and behavioural trends.
+
+![Monthly Demand Pattern](monthly_demand_pattern.png)
+
+---
+
+### COVID Policy Timeline
+
+Visualises the implementation timeline of key COVID-related policies and restrictions used in the analysis.
 
 ![COVID Policy Timeline](covid_policy_timeline.png)
 
-![Pre During Post COVID Comparison](pre_during_post_covid_comparison.png)
+---
 
-![Regression Results](regression_results.png)
+### Bike Hire Distribution
+
+Boxplot visualisation used to review the distribution of bike hires and identify potential outliers within the dataset.
+
+![Bike Hire Distribution](bike_hire_distribution.png)
+
+
 
 ## Project Value
 
