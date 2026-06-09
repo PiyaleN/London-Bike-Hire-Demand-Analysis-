@@ -1,91 +1,116 @@
-# London-Bike-Hire-Demand-Analysis-
+# London Bike Hire Demand — COVID-19 Impact Analysis
 
-# London Bike Hire Demand Analysis During COVID-19
+![R](https://img.shields.io/badge/R-4.x-blue)
+![ggplot2](https://img.shields.io/badge/ggplot2-3.4-orange)
+![forecast](https://img.shields.io/badge/forecast-8.21-green)
 
-## Overview
+A behavioural demand analysis of London's bike-sharing scheme from 2010–2023, examining how COVID-19 restrictions reshaped cycling patterns. Uses multiple linear regression, ANOVA, and time-series visualisation to quantify the impact of policy interventions (WFH, Eat Out to Help Out, Rule of 6) on bike hire demand.
 
-This project analyses London bike hire demand between 2010 and 2023, with a focus on how COVID-19 restrictions and behavioural changes affected daily bike hire patterns.
+---
 
-The analysis explores bike hire trends before, during, and after COVID-19, using statistical analysis, visualisation, regression modelling, and ANOVA to understand the relationship between policy restrictions and transport demand.
+## Key Findings
 
-## Business Problem
+| Policy Variable | Coefficient | 95% CI | p-value |
+|----------------|-------------|--------|---------|
+| Work From Home | +1,769 hires | [1,117, 2,421] | < 0.05 |
+| Eat Out to Help Out | +9,869 hires | [6,276, 13,460] | < 0.05 |
+| Rule of 6 Indoors | +9,309 hires | [7,367, 11,251] | < 0.05 |
 
-Transport demand changed significantly during COVID-19 due to work-from-home rules, business closures, stay-at-home policies, and social restrictions.
+All three COVID-era policies were associated with **statistically significant increases** in bike hire demand, with seasonal factors (month, year, day) being the strongest overall predictors.
 
-This project investigates how these policy changes influenced bike hire behaviour in London and identifies which time-based or policy-related factors were most relevant to demand changes.
+---
 
-## Tools Used
+## Analysis Pipeline
 
-* R
-* tidyverse
-* ggplot2
-* dplyr
-* lubridate
-* forecast
-* tsibble
-* Linear regression
-* ANOVA
+```
+┌──────────────────┐     ┌───────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  London Bikes    │────▶│  Pre/During/      │────▶│  Linear          │────▶│  ANOVA Model     │
+│  Dataset         │     │  Post-COVID       │     │  Regression      │     │  Comparison      │
+│  2010–2023       │     │  Segmentation     │     │  per Policy Var  │     │  + Visualisation │
+│  + Policy vars   │     │  (Mar 2020 cut)   │     │  + Interactions  │     │                  │
+└──────────────────┘     └───────────────────┘     └──────────────────┘     └──────────────────┘
+```
 
-## Methodology
+### Methodology
 
-* Imported and cleaned London bike hire data
-* Checked missing values, duplicates, and outliers
-* Aggregated bike hires by year
-* Split the data into pre-COVID, during-COVID, and post-COVID periods
-* Visualised demand trends across different periods
-* Analysed COVID policy indicators including work from home, rule of six, curfew, and Eat Out to Help Out
-* Built regression models to assess relationships between policy variables and bike hires
-* Used ANOVA to compare model performance across year, month, and day-level interactions
+1. **Segmentation** — Data split into pre-COVID (before Mar 2020), during-COVID (Mar 2020–Mar 2021), post-COVID (after Apr 2021)
+2. **Policy Variables** — `schools_closed`, `pubs_closed`, `wfh`, `rule_of_6_indoors`, `curfew`, `eat_out_to_help_out`, and others
+3. **Regression Models** — Individual linear models for each policy variable, with interaction terms for year, month, and day of week
+4. **ANOVA** — Hierarchical model comparison to identify the most influential interaction variables
+
+---
+
+## Results
+
+### Yearly Trends
+![Yearly Trends](yearly_bike_hire_trends.png)
+
+### COVID Period Comparison
+![COVID Periods](covid_period_comparison.png)
+
+### Monthly Demand Pattern
+![Monthly Demand](monthly_demand_pattern.png)
+
+### Policy Timeline
+![Policy Timeline](covid_policy_timeline.png)
+
+### Distribution
+![Distribution](bike_hire_distribution.png)
+
+---
 
 ## Key Insights
 
-* Bike hire demand showed visible changes across pre-COVID, during-COVID, and post-COVID periods.
-* Time-based factors such as month, year, and day improved model performance when included with policy variables.
-* Work-from-home and COVID restriction variables alone did not fully explain bike hire demand.
-* ANOVA results suggested that adding time-based interaction effects improved the ability to explain bike hire variation.
-
-## ## Visualisations
-
-### Yearly Bike Hire Trends
-
-Shows the overall change in London bike hire demand across different years, highlighting behavioural shifts during and after COVID-19 restrictions.
-
-![Yearly Bike Hire Trends](yearly_bike_hire_trends.png)
+- **Peak demand**: Quarter 2 (spring/summer); **lowest**: December–January
+- **Mid-week (Tue–Thu)** sees highest daily demand; Sunday lowest
+- **WFH** correlated with +1,769 hires — flexible working enabled leisure cycling
+- **Eat Out to Help Out** drove the largest single-policy boost (+9,869 hires)
+- **Month** was the most significant interaction variable across all policy models (ANOVA)
+- All COVID-era policies showed weak positive correlations (7–13%) with demand
 
 ---
 
-### COVID Period Demand Comparison
+## Project Structure
 
-Compares bike hire demand before, during and after COVID-19 to identify changes in mobility behaviour and transport usage patterns.
-
-![COVID Period Comparison](covid_period_comparison.png)
-
----
-
-### Monthly Demand Patterns
-
-Analyses month-wise variation in bike hire demand across different COVID periods to understand seasonal and behavioural trends.
-
-![Monthly Demand Pattern](monthly_demand_pattern.png)
-
----
-
-### COVID Policy Timeline
-
-Visualises the implementation timeline of key COVID-related policies and restrictions used in the analysis.
-
-![COVID Policy Timeline](covid_policy_timeline.png)
+```
+├── london_bike_hire_covid_analysis.Rmd    # RMarkdown analysis
+├── london_bike_hire_covid_analysis.html   # Rendered HTML report
+├── London_COVID_bikes.csv                 # Dataset with policy indicators
+├── yearly_bike_hire_trends.png
+├── covid_period_comparison.png
+├── monthly_demand_pattern.png
+├── covid_policy_timeline.png
+├── bike_hire_distribution.png
+└── README.md
+```
 
 ---
 
-### Bike Hire Distribution
+## Installation & Reproduce
 
-Boxplot visualisation used to review the distribution of bike hires and identify potential outliers within the dataset.
+```bash
+git clone https://github.com/Piyali-Narnaware/London-Bike-Hire-Demand-Analysis-.git
+cd London-Bike-Hire-Demand-Analysis-
+```
 
-![Bike Hire Distribution](bike_hire_distribution.png)
+Open `london_bike_hire_covid_analysis.Rmd` in RStudio and **Knit to HTML**, or run:
 
+```r
+rmarkdown::render("london_bike_hire_covid_analysis.Rmd")
+```
 
+### Dependencies
 
-## Project Value
+```r
+install.packages(c("tidyverse", "ggplot2", "dplyr", "lubridate",
+                   "forecast", "tsibble", "lmtest", "scales"))
+```
 
-This project demonstrates public transport analytics, statistical modelling, time-based trend analysis, and policy impact evaluation using R. It shows how data can be used to understand behavioural change and support transport planning decisions.
+---
+
+## Dataset
+
+- **Source**: Transport for London (TfL) cycling data + UK Government COVID policy tracker
+- **Period**: 2010–2023 (13 years)
+- **Frequency**: Daily bike hire counts
+- **Policy Variables**: 10+ binary indicators for COVID-19 restriction phases
